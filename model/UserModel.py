@@ -6,6 +6,9 @@ from util.TimeUtil import now_timestamp
 
 
 class UserModel(BaseModel):
+    """
+    用户模型
+    """
     __tablename__: str = "user"
     # 主键
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True, unique=True, comment="主键，自增，唯一")
