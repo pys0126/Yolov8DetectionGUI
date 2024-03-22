@@ -1,5 +1,6 @@
-flet
 pymysql
-sqlalchemy
-ultralytics
+flet~=0.21.2
 opencv-python
+pillow~=10.2.0
+sqlalchemy~=2.0.28
+ultralytics~=8.1.30

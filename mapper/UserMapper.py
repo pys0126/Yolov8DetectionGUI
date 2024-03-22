@@ -1,3 +1,4 @@
+from typing import Optional
 from model.UserModel import UserModel
 from util.MysqlUtil import mysql_session, auto_close_session
 
@@ -30,10 +31,10 @@ def delete(user_model: UserModel) -> None:
 
 
 @auto_close_session
-def find_by_id(user_id: int) -> UserModel:
+def find_by_id(user_id: int) -> Optional[UserModel]:
     return mysql_session.query(UserModel).filter_by(id=user_id).first()
 
 
 @auto_close_session
-def find_by_username(username: str) -> UserModel:
+def find_by_username(username: str) -> Optional[UserModel]:
     return mysql_session.query(UserModel).filter_by(username=username).first()

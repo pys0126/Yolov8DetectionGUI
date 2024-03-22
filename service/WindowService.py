@@ -1,11 +1,12 @@
 """
 界面类
 """
-import os
-from typing import Optional, Union
 from flet import *
+from typing import Optional, Union
 from config import GlobalConfig
 from service.UserService import login
+from service.ObjectService import object_num_detect, list_object_by_user_id, delete_object_by_id
+from util.TimeUtil import timestamp_to_str
 
 
 class WindowService:
@@ -38,51 +39,88 @@ class WindowService:
         主页
         :return:
         """
-
-        def upload_file(file_picker_result: FilePickerResultEvent) -> None:
+        def file_picker_handler(file_picker_result: FilePickerResultEvent) -> None:
             """
-            文件上传
+            文件选择器钩子
             :param file_picker_result:
             :return:
             """
-            file_path: str = file_picker_result.files[0].path
-            filename: str = os.path.basename(file_path)
-            upload_button.content = Image(
-                src=file_picker_result.files[0].path,
-                fit=ImageFit.CONTAIN,
-            )
-            upload_button.update()
+            if file_picker_result.files:
+                file_path = file_picker_result.files[0].path
+                # 设置上传图片的路径
+                self.window_page.session.set("file_path", file_path)
+                # 将图片显示在视图左侧
+                image_container.content = Image(
+                    src=file_path,
+                    fit=ImageFit.CONTAIN,
+                )
+                image_container.update()
 
-        # 文件上传按钮
-        upload_button: Container = Container(
-            content=Text("这里将显示图片"),
+        def detection_image(event: ControlEvent) -> None:
+            """
+            识别图片
+            :param event: 点击事件类
+            :return:
+            """
+            # 获取上传图片的路径
+            file_path: str = self.window_page.session.get("file_path")
+            # 判断是否选择了图片
+            if not file_path:
+                self.open_modal(title="提示", content="未选择图片")
+            else:
+                # 先显示进度环
+                result_container.content = Column(
+                    [ProgressRing(), Text("正在识别中...")],
+                    horizontal_alignment=CrossAxisAlignment.CENTER,
+                )
+                result_container.update()
+                # 识别图片
+                result: Union[str, int] = object_num_detect(image_path=file_path,
+                                                            user_id=self.window_page.session.get(
+                                                                self.user_key).get("id"))
+                # 如果识别为str类型，则显示提示信息
+                if isinstance(result, str):
+                    self.open_modal(title="提示", content=result)
+                    # 还原图片显示控件
+                    image_container.content = Text("选择待识别图片...")
+                else:
+                    # 将识别结果显示在视图右侧
+                    result_container.content = Text(f"识别到的人数：{result}")
+                    result_container.update()
+        # 添加文件上传
+        files_picker: FilePicker = FilePicker(on_result=file_picker_handler)
+        self.window_page.overlay.append(files_picker)
+        self.window_page.update()
+        # 图片显示控件
+        image_container: Container = Container(
+            content=Text("选择待识别图片..."),
+            ink=True,
             margin=10,
-            padding=10,
-            alignment=alignment.center,
             width=200,
             height=150,
-            border_radius=10
+            padding=10,
+            border_radius=10,
+            alignment=alignment.center,
+            border=border.all(2, colors.SURFACE_VARIANT),
+            on_click=lambda _: files_picker.pick_files(allow_multiple=False)
         )
         # 识别结果控件
         result_container: Container = Container(
             content=Text("这里将显示识别结果"),
             margin=10,
-            padding=10,
-            alignment=alignment.center,
             width=200,
             height=150,
-            border_radius=10
+            padding=10,
+            border_radius=10,
+            alignment=alignment.center,
+            border=border.all(2, colors.SURFACE_VARIANT)
         )
-        # 添加文件上传
-        upload_picker: FilePicker = FilePicker(on_result=upload_file)
-        self.window_page.overlay.append(upload_picker)
-        self.window_page.update()
         # 绘制页面
         self.window_page.views.append(
             View(
                 route="/",
                 controls=[
-                    AppBar(title=Text("主页"), center_title=True, bgcolor=colors.SURFACE_VARIANT),
+                    AppBar(title=Text("人员数量识别器"), center_title=True, bgcolor=colors.SURFACE_VARIANT),
                     Row(
                         alignment=MainAxisAlignment.SPACE_BETWEEN,
                         controls=[
@@ -92,7 +130,7 @@ class WindowService:
                             ),
                             Container(
                                 alignment=alignment.top_right,  # 居中
-                                content=FilledTonalButton("查看历史记录",
+                                content=FilledTonalButton("查看识别记录",
                                                           on_click=lambda _: self.window_page.go("/history"),
                                                           style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
                             )
@@ -102,14 +140,13 @@ class WindowService:
                     Row(
                         alignment=MainAxisAlignment.SPACE_BETWEEN,
                         controls=[
-                            upload_button,
+                            image_container,
                             result_container
                         ]
                     ),
                     Container(
                         alignment=alignment.center,  # 居中
-                        content=FilledTonalButton(text="点击识别图片",
-                                                  on_click=upload_picker.pick_files(allow_multiple=False),
+                        content=FilledTonalButton(text="点击识别图片", on_click=detection_image,
                                                   style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
                     )
                 ]
@@ -121,8 +158,12 @@ class WindowService:
         登录页
         :return:
         """
-
         def login_handler(event: ControlEvent) -> None:
+            """
+            登录钩子
+            :param event: 点击事件类
+            :return:
+            """
             result: Union[str, dict] = login(username=username.value, password=password.value)
             # 没有返回数据，说明登录成功了
             if isinstance(result, dict):
@@ -152,6 +193,69 @@ class WindowService:
                         alignment=alignment.center,  # 居中
                         content=FilledTonalButton(text="提交", on_click=login_handler,
                                                   style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
+                    )
+                ],
+            )
+        )
+
+    def history_view(self) -> None:
+        """
+        历史记录页面
+        :return:
+        """
+        # 获取用户信息
+        user_info: dict = self.window_page.session.get(self.user_key)
+        # 构造列表元素的控件
+        list_view_data: list = []
+        for object_dict in list_object_by_user_id(user_info.get("id")):
+            # 转换时间戳为字符串
+            object_dict["create_time"] = timestamp_to_str(timestamp=object_dict.get("create_timestamp"))
+            list_view_data.append(
+                Container(
+                    alignment=alignment.top_left,
+                    border=border.all(2, colors.SURFACE_VARIANT),
+                    padding=10,
+                    content=Row(
+                        alignment=MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            Text(f"图片名称：{object_dict.get('image_name')}\n识别到的人数：{object_dict.get('totality')}"),
+                            Text(f"识别时间：{object_dict.get('create_time')}"),
+                            FilledTonalButton(
+                                text="删除",
+                                on_click=lambda _: delete_object_by_id(object_id=object_dict.get("id")),
+                                style=ButtonStyle(shape=RoundedRectangleBorder(radius=10), color=colors.RED_ACCENT)
+                            )
+                        ]
+                    )
+                )
+            )
+        self.window_page.views.append(
+            View(
+                route="/history",
+                controls=[
+                    AppBar(title=Text("识别历史记录"), center_title=True, bgcolor=colors.SURFACE_VARIANT),
+                    Row(
+                        alignment=MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            Container(
+                                alignment=alignment.top_left,  # 居中
+                                content=Text(f"当前用户：{user_info.get('username')}")
+                            ),
+                            Container(
+                                alignment=alignment.top_right,  # 居中
+                                content=FilledTonalButton("返回首页",
+                                                          on_click=lambda _: self.window_page.go("/"),
+                                                          style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
+                            )
+                        ]
+                    ),
+                    Divider(),
+                    ListView(
+                        data=list_object_by_user_id(user_info.get("id")),
+                        spacing=10,
+                        padding=10,
+                        auto_scroll=True,
+                        controls=list_view_data
                     )
                 ],
             )
@@ -213,5 +317,7 @@ class WindowService:
             self.login_view()
         elif self.window_page.route == "/":
             self.index_view()
+        elif self.window_page.route == "/history":
+            self.history_view()
         # 更新页面
         self.window_page.update()

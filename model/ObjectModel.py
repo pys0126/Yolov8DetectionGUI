@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Mapped
 from util.MysqlUtil import BaseModel
 from sqlalchemy.orm import mapped_column
-from sqlalchemy import String, Integer, Text
+from sqlalchemy import Integer, Text
 from util.TimeUtil import now_timestamp
 
 

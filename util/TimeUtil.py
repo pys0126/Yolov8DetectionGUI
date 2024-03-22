@@ -39,3 +39,13 @@ def date_difference(start_date: datetime, end_date: datetime) -> int:
     :return: 日期差
     """
     return (end_date - start_date).days
+
+
+def timestamp_to_str(timestamp: int, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """
+    时间戳转字符串
+    :param timestamp: 时间戳整数
+    :param format_str: 格式字符串
+    :return: 字符串
+    """
+    return datetime.fromtimestamp(timestamp).strftime(format_str)
