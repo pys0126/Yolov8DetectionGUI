@@ -1,4 +1,6 @@
-# 基于Yolov8的人数识别GUI程序
+# Python 人数识别 GUI 程序 
+
+本项目使用 [Yolov8](https://docs.ultralytics.com/) 模型库进行人数识别，使用 [Flet](https://flet.dev/) 构建 GUI，使用 [SQLAlchemy](https://www.sqlalchemy.org/) 操作数据库。
 
 本项目采用的技术栈：
 - 语言：`Python3.9`
