@@ -123,15 +123,22 @@ def generate_verification_code() -> str:
     return code
 
 
+# 视频文件扩展名列表
+video_extensions: list = ["mp4", "avi", "mov", "wmv", "mkv"]
+
+
 def is_video_file(file_path: str) -> bool:
     """
     是否是视频文件
     :param file_path: 文件路径
     :return:
     """
-    video_extensions = [".mp4", ".avi", ".mov", ".wmv", ".mkv"]  # 常见的视频文件扩展名列表
-    file_ext = os.path.splitext(file_path)[1]  # 获取文件的扩展名
+    file_ext = os.path.splitext(file_path)[1].replace(".", "")  # 获取文件的扩展名
     return file_ext.lower() in video_extensions
+
+
+# 图片文件扩展名列表
+image_extensions: list = ["jpg", "jpeg", "png", "gif", "bmp"]
 
 
 def is_image_file(file_path: str) -> bool:
@@ -140,6 +147,5 @@ def is_image_file(file_path: str) -> bool:
     :param file_path: 文件路径
     :return:
     """
-    video_extensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp"]  # 常见的图片文件扩展名列表
-    file_ext = os.path.splitext(file_path)[1]  # 获取文件的扩展名
-    return file_ext.lower() in video_extensions
+    file_ext = os.path.splitext(file_path)[1].replace(".", "")  # 获取文件的扩展名
+    return file_ext.lower() in image_extensions

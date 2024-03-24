@@ -6,8 +6,8 @@ from flet import *
 from config import GlobalConfig
 from typing import Optional, Union
 from service.ObjectService import *
-from util.StringUtil import is_video_file, is_image_file
 from util.TimeUtil import timestamp_to_str
+from util.StringUtil import is_image_file, is_video_file, video_extensions, image_extensions
 from service.UserService import login, register
 
 
@@ -48,12 +48,20 @@ class WindowService:
             :param file_picker_result:
             :return:
             """
+            # 先还原各控件
+            result_container.content = Text("这里将显示识别结果")
+            # 如果结果控件大于2个，说明有文字结果，给干掉
+            if len(result_view.controls) > 2:
+                result_view.controls.pop(-1)
+            # 更新页面
+            self.window_page.update()
             if file_picker_result.files:
                 file_path = file_picker_result.files[0].path
                 # 设置上传图片的路径
                 self.window_page.session.set("file_path", file_path)
                 # 默认显示文件名
                 image_container.content = Text(value=file_path)
+                video_container.content = Text(value=file_path)
                 # 如果是图片文件，将显示它
                 if is_image_file(file_path=file_path):
                     # 将图片显示在视图左侧
@@ -61,7 +69,23 @@ class WindowService:
                         src=file_path,
                         fit=ImageFit.CONTAIN,
                     )
-                image_container.update()
+                    video_container.content = Text("选择视频...")
+                elif is_video_file(file_path=file_path):
+                    # 将视频显示在视图左侧
+                    video_container.content = flet.Video(
+                        volume=0,
+                        expand=False,
+                        show_controls=False,  # 隐藏控制栏
+                        playlist=[VideoMedia(file_path)],
+                        playlist_mode=PlaylistMode.LOOP,
+                        autoplay=True
+                    )
+                    image_container.content = Text("选择图片...")
+                # 各控件点击事件清空，不能点击
+                image_container.on_click = None
+                video_container.on_click = None
+                # 更新页面
+                self.window_page.update()
 
         def detection_object(event: ControlEvent) -> None:
             """
@@ -69,6 +93,12 @@ class WindowService:
             :param event: 点击事件类
             :return:
             """
+            # 先还原各控件
+            result_container.content = Text("这里将显示识别结果")
+            # 如果结果控件大于2个，说明有文字结果，给干掉
+            if len(result_view.controls) > 2:
+                result_view.controls.pop(-1)
+            result_view.update()
             # 获取上传文件的路径
             file_path: str = self.window_page.session.get("file_path")
             # 判断是否选择了图片
@@ -82,9 +112,9 @@ class WindowService:
                 )
                 detection_container.update()
                 # 识别物体
-                result: Union[str, int] = object_num_detect(file_path=file_path,
-                                                            user_id=self.window_page.session.get(
-                                                                self.user_key).get("id"))
+                result: Union[str, tuple] = object_num_detect(file_path=file_path,
+                                                              user_id=self.window_page.session.get(
+                                                                  self.user_key).get("id"))
                 # 如果识别为str类型，则显示提示信息
                 if isinstance(result, str):
                     self.open_modal(title="提示", content=result)
@@ -92,10 +122,39 @@ class WindowService:
                     image_container.content = Text("选择待识别图片/视频...")
                     result_container.content = Text("这里将显示识别结果")
                 else:
-                    # 将识别结果显示在视图右侧
-                    result_container.content = Text(f"识别到的人数：{result}")
-                # 还原点击识别按钮控件
-                detection_container.content = detection_button
+                    # 定义结果文件路径
+                    result_file_path: str = os.path.join("cache", os.path.basename(file_path))
+                    # 如果是图片文件，则显示识别结果图片
+                    if is_image_file(file_path=file_path):
+                        result_container.content = flet.Image(
+                            src=result_file_path,  # 识别结果图片路径
+                            fit=ImageFit.CONTAIN,
+                        )
+                    elif is_video_file(file_path=file_path):
+                        # 将识别结果显示在视图右侧
+                        result_container.content = flet.Video(
+                            expand=False,
+                            volume=0,
+                            show_controls=False,  # 隐藏控制栏
+                            playlist=[VideoMedia(result_file_path)],  # 识别结果视频路径
+                            playlist_mode=PlaylistMode.LOOP,
+                            autoplay=True
+                        )
+                    # 将识别结果添加到结果视图中
+                    result_view.controls.append(Column(
+                        spacing=10,
+                        controls=[
+                            Text(f"识别到的人数：{result[0]}"),
+                            Text(f"总推理耗时：{result[1]} ms")
+                        ]
+                    ))
+                    # 文件选择启动点击
+                    image_container.on_click = lambda _: files_picker.pick_files(allow_multiple=False,
+                                                                                 allowed_extensions=image_extensions)
+                    video_container.on_click = lambda _: files_picker.pick_files(allow_multiple=False,
+                                                                                 allowed_extensions=video_extensions)
+                    # 还原点击识别按钮控件
+                    detection_container.content = detection_button
                 # 更新页面
                 self.window_page.update()
 
@@ -121,7 +180,7 @@ class WindowService:
         )
         # 图片显示控件
         image_container: Container = Container(
-            content=Text("选择待识别图片/视频..."),
+            content=Text("选择待识别图片..."),
             ink=True,
             margin=10,
             width=200,
@@ -130,20 +189,51 @@ class WindowService:
             border_radius=10,
             alignment=alignment.center,
             border=border.all(2, colors.SURFACE_VARIANT),
-            on_click=lambda _: files_picker.pick_files(allow_multiple=False)
+            on_click=lambda _: files_picker.pick_files(allow_multiple=False,
+                                                       allowed_extensions=image_extensions)
         )
-        # 识别结果控件
-        result_container: Container = Container(
-            content=Text("这里将显示识别结果"),
+        # 视频显示控件
+        video_container: Container = Container(
+            content=Text("选择待识别视频..."),
+            ink=True,
             margin=10,
             width=200,
             height=150,
             padding=10,
             border_radius=10,
             alignment=alignment.center,
-            border=border.all(2, colors.SURFACE_VARIANT)
+            border=border.all(2, colors.SURFACE_VARIANT),
+            on_click=lambda _: files_picker.pick_files(allow_multiple=False,
+                                                       allowed_extensions=video_extensions)
+        )
+        # 识别结果控件
+        result_container: Container = Container(
+            content=Text("这里将显示识别结果"),
+            margin=10,
+            width=300,
+            height=250,
+            padding=10,
+            border_radius=10,
+            alignment=alignment.center,
+            border=border.all(2, colors.SURFACE_VARIANT),
+            ink=True,
+            on_click=lambda _: os.system(f"explorer {os.getcwd()}\\cache") if os.path.exists("cache") else None
+        )
+        # 结果板块
+        result_view: Row = Row(
+            alignment=MainAxisAlignment.SPACE_BETWEEN,
+            controls=[
+                Column(
+                    controls=[
+                        image_container,
+                        video_container
+                    ]
+                ),
+                result_container
+            ]
         )
         # 绘制页面
+        self.window_page.window_height = 800  # 增加窗口高度
         self.window_page.views.append(
             View(
                 route="/",
@@ -179,13 +269,44 @@ class WindowService:
                         ]
                     ),
                     Divider(),
-                    Row(
-                        alignment=MainAxisAlignment.SPACE_BETWEEN,
-                        controls=[
-                            image_container,
-                            result_container
-                        ]
+                    Container(
+                        padding=10,
+                        content=Column(
+                            controls=[
+                                Row(
+                                    alignment=MainAxisAlignment.SPACE_BETWEEN,
+                                    controls=[
+                                        Text("设置置信度："),
+                                        Slider(
+                                            min=0,
+                                            max=10,
+                                            divisions=10,
+                                            value=DetectionConfig.CONFIDENCE_THRESHOLD * 10,  # 默认为当前设置的置信度
+                                            label="{value}",
+                                            on_change=lambda event: DetectionConfig.set_confidence_threshold(
+                                                confidence_threshold=event.control.value / 10)
+                                        )
+                                    ]
+                                ),
+                                Row(
+                                    alignment=MainAxisAlignment.SPACE_BETWEEN,
+                                    controls=[
+                                        Text("设置IOU："),
+                                        Slider(
+                                            min=0,
+                                            max=10,
+                                            divisions=10,
+                                            value=DetectionConfig.IOU * 10,  # 默认为当前设置的IOU
+                                            label="{value}",
+                                            on_change=lambda event: DetectionConfig.set_iou(
+                                                iou=event.control.value / 10)
+                                        )
+                                    ]
+                                )
+                            ]
+                        )
                     ),
+                    result_view,
                     detection_container
                 ]
             )
@@ -356,6 +477,7 @@ class WindowService:
             # 如果有记录，则列出记录
             if object_list:
                 object_column.controls = object_list
+            self.window_page.window_height = 600
             self.window_page.update()
 
         # 获取用户信息
@@ -365,7 +487,7 @@ class WindowService:
             alignment=MainAxisAlignment.CENTER,
             spacing=10,
             width=GlobalConfig.WINDOW_WIDTH,
-            height=300,
+            height=400,
             scroll=ScrollMode.ALWAYS,
             on_scroll_interval=0
         )
@@ -397,7 +519,7 @@ class WindowService:
                         border=border.all(width=2),
                         padding=5
                     )
-                ],
+                ]
             )
         )
 
