@@ -3,7 +3,7 @@
 """
 import hashlib
 import random
-import re
+import re, os
 import base64
 import urllib.parse
 from urllib.parse import urlparse
@@ -121,3 +121,25 @@ def generate_verification_code() -> str:
         digit = random.randint(0, 9)
         code += str(digit)
     return code
+
+
+def is_video_file(file_path: str) -> bool:
+    """
+    是否是视频文件
+    :param file_path: 文件路径
+    :return:
+    """
+    video_extensions = [".mp4", ".avi", ".mov", ".wmv", ".mkv"]  # 常见的视频文件扩展名列表
+    file_ext = os.path.splitext(file_path)[1]  # 获取文件的扩展名
+    return file_ext.lower() in video_extensions
+
+
+def is_image_file(file_path: str) -> bool:
+    """
+    是否是图片文件
+    :param file_path: 文件路径
+    :return:
+    """
+    video_extensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp"]  # 常见的图片文件扩展名列表
+    file_ext = os.path.splitext(file_path)[1]  # 获取文件的扩展名
+    return file_ext.lower() in video_extensions

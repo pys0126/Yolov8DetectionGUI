@@ -1,24 +1,26 @@
 """
 界面类
 """
+import flet
 from flet import *
-from typing import Optional, Union
 from config import GlobalConfig
-from service.UserService import login
-from service.ObjectService import object_num_detect, list_object_by_user_id, delete_object_by_id
+from typing import Optional, Union
+from service.ObjectService import *
+from util.StringUtil import is_video_file, is_image_file
 from util.TimeUtil import timestamp_to_str
+from service.UserService import login, register
 
 
 class WindowService:
     def __init__(self, window_page: Page) -> None:
-        self.window_page = window_page
+        self.window_page: Page = window_page
         # 设置窗口标题
         self.window_page.title = GlobalConfig.WINDOW_TITLE
         # 设置窗口大小
         self.window_page.window_width = GlobalConfig.WINDOW_WIDTH
         self.window_page.window_height = GlobalConfig.WINDOW_HEIGHT
         # 设置缓存用户信息的Key
-        self.user_key = "user_info"
+        self.user_key: str = "user_info"
         # 构建页面
         self.build()
         # 定义一些钩子
@@ -39,6 +41,7 @@ class WindowService:
         主页
         :return:
         """
+
         def file_picker_handler(file_picker_result: FilePickerResultEvent) -> None:
             """
             文件选择器钩子
@@ -49,51 +52,74 @@ class WindowService:
                 file_path = file_picker_result.files[0].path
                 # 设置上传图片的路径
                 self.window_page.session.set("file_path", file_path)
-                # 将图片显示在视图左侧
-                image_container.content = Image(
-                    src=file_path,
-                    fit=ImageFit.CONTAIN,
-                )
+                # 默认显示文件名
+                image_container.content = Text(value=file_path)
+                # 如果是图片文件，将显示它
+                if is_image_file(file_path=file_path):
+                    # 将图片显示在视图左侧
+                    image_container.content = flet.Image(
+                        src=file_path,
+                        fit=ImageFit.CONTAIN,
+                    )
                 image_container.update()
 
-        def detection_image(event: ControlEvent) -> None:
+        def detection_object(event: ControlEvent) -> None:
             """
-            识别图片
+            识别物体
             :param event: 点击事件类
             :return:
             """
-            # 获取上传图片的路径
+            # 获取上传文件的路径
             file_path: str = self.window_page.session.get("file_path")
             # 判断是否选择了图片
             if not file_path:
-                self.open_modal(title="提示", content="未选择图片")
+                self.open_modal(title="提示", content="未选择文件")
             else:
-                # 先显示进度环
+                # 先禁用点击识别按钮
+                detection_button.disabled = True
+                # 显示进度环
                 result_container.content = Column(
                     [ProgressRing(), Text("正在识别中...")],
                     horizontal_alignment=CrossAxisAlignment.CENTER,
                 )
                 result_container.update()
-                # 识别图片
-                result: Union[str, int] = object_num_detect(image_path=file_path,
+                # 识别物体
+                result: Union[str, int] = object_num_detect(file_path=file_path,
                                                             user_id=self.window_page.session.get(
                                                                 self.user_key).get("id"))
                 # 如果识别为str类型，则显示提示信息
                 if isinstance(result, str):
                     self.open_modal(title="提示", content=result)
-                    # 还原图片显示控件
-                    image_container.content = Text("选择待识别图片...")
+                    # 还原各控件
+                    image_container.content = Text("选择待识别图片/视频...")
+                    result_container.content = Text("这里将显示识别结果")
                 else:
                     # 将识别结果显示在视图右侧
                     result_container.content = Text(f"识别到的人数：{result}")
-                    result_container.update()
+                # 启用点击识别按钮
+                detection_button.disabled = False
+                # 更新页面
+                self.window_page.update()
+
+        def logout() -> None:
+            """
+            退出登录
+            :return:
+            """
+            self.window_page.session.clear()  # 清空Session
+            self.window_page.go("/login")  # 返回登录页
+
         # 添加文件上传
         files_picker: FilePicker = FilePicker(on_result=file_picker_handler)
         self.window_page.overlay.append(files_picker)
         self.window_page.update()
+        # 点击识别按钮控件
+        detection_button: FilledTonalButton = FilledTonalButton(text="点击识别", on_click=detection_object,
+                                                                style=ButtonStyle(
+                                                                    shape=RoundedRectangleBorder(radius=10)))
         # 图片显示控件
         image_container: Container = Container(
-            content=Text("选择待识别图片..."),
+            content=Text("选择待识别图片/视频..."),
             ink=True,
             margin=10,
             width=200,
@@ -130,15 +156,16 @@ class WindowService:
                             ),
                             Container(
                                 alignment=alignment.top_right,  # 居中
-                                content=FilledTonalButton("查看识别记录",
+                                content=FilledTonalButton(text="查看识别记录",
                                                           on_click=lambda _: self.window_page.go("/history"),
                                                           style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
                             ),
                             Container(
                                 alignment=alignment.top_right,  # 居中
-                                content=FilledTonalButton("退出登录",
-                                                          on_click=lambda _: self.window_page.go("/history"),
-                                                          style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
+                                content=FilledTonalButton(text="退出登录",
+                                                          on_click=lambda _: logout(),
+                                                          style=ButtonStyle(shape=RoundedRectangleBorder(radius=10),
+                                                                            bgcolor=colors.RED_400))
                             )
                         ]
                     ),
@@ -152,10 +179,60 @@ class WindowService:
                     ),
                     Container(
                         alignment=alignment.center,  # 居中
-                        content=FilledTonalButton(text="点击识别图片", on_click=detection_image,
-                                                  style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
+                        content=detection_button
                     )
                 ]
+            )
+        )
+
+    def register_view(self) -> None:
+        """
+        注册页
+        :return:
+        """
+
+        def reg_handler(event: ControlEvent) -> None:
+            """
+            注册钩子
+            :param event: 点击事件类
+            :return:
+            """
+            result: Optional[str] = register(username=username.value, password=password.value)
+            # 没有返回数据，说明注册成功了
+            if not result:
+                self.open_modal(title="提示", content="注册成功，跳转到登录页")
+                self.window_page.go("/login")
+            else:
+                self.open_modal(title="提示", content=result)
+
+        username: TextField = TextField(label="用户名", text_align=TextAlign.LEFT)
+        password: TextField = TextField(label="密码", text_align=TextAlign.LEFT, password=True)
+        self.window_page.views.append(
+            View(
+                route="/register",
+                controls=[
+                    AppBar(title=Text("注册"), center_title=True, bgcolor=colors.SURFACE_VARIANT),
+                    Container(
+                        alignment=alignment.center,  # 居中
+                        content=username
+                    ),
+                    Container(
+                        alignment=alignment.center,  # 居中
+                        content=password
+                    ),
+                    Container(
+                        alignment=alignment.center_left,  # 居中向左
+                        content=TextButton(
+                            text="已有账号，去登录...",
+                            on_click=lambda _: self.window_page.go("/login")
+                        )
+                    ),
+                    Container(
+                        alignment=alignment.center,  # 居中
+                        content=FilledTonalButton(text="提交", on_click=reg_handler,
+                                                  style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
+                    )
+                ],
             )
         )
 
@@ -164,6 +241,7 @@ class WindowService:
         登录页
         :return:
         """
+
         def login_handler(event: ControlEvent) -> None:
             """
             登录钩子
@@ -171,7 +249,7 @@ class WindowService:
             :return:
             """
             result: Union[str, dict] = login(username=username.value, password=password.value)
-            # 没有返回数据，说明登录成功了
+            # 返回dict数据，说明登录成功了
             if isinstance(result, dict):
                 self.window_page.session.set(self.user_key, result)
                 self.window_page.go("/")
@@ -196,11 +274,18 @@ class WindowService:
                         content=password
                     ),
                     Container(
+                        alignment=alignment.center_left,  # 居中向左
+                        content=TextButton(
+                            text="还没有账号，去注册...",
+                            on_click=lambda _: self.window_page.go("/register")
+                        )
+                    ),
+                    Container(
                         alignment=alignment.center,  # 居中
                         content=FilledTonalButton(text="提交", on_click=login_handler,
                                                   style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
                     )
-                ],
+                ]
             )
         )
 
@@ -209,6 +294,7 @@ class WindowService:
         历史记录页面
         :return:
         """
+
         def delete_handler(object_id: int) -> None:
             """
             删除物体记录
@@ -238,13 +324,17 @@ class WindowService:
                         content=Row(
                             alignment=MainAxisAlignment.SPACE_BETWEEN,
                             controls=[
-                                Text(f"图片名称：{object_dict.get('image_name')}\n"
-                                     f"识别到的人数：{object_dict.get('totality')}"),
-                                Text(f"识别时间：{object_dict.get('create_time')}"),
+                                # 限制图片名称长度
+                                Text(
+                                    value=f"图片名称：{object_dict.get('image_name')[:28] + '...' if len(object_dict.get('image_name')) > 32 else object_dict.get('image_name')}\n"
+                                          f"识别到的人数：{object_dict.get('totality')}\n"
+                                          f"识别时间：{object_dict.get('create_time')}",
+                                    tooltip=object_dict.get("image_name")),
                                 FilledTonalButton(
                                     text="删除",
-                                    on_click=lambda _: delete_handler(object_id=object_dict.get("id")),
-                                    style=ButtonStyle(shape=RoundedRectangleBorder(radius=10), color=colors.RED_ACCENT)
+                                    on_click=lambda event: delete_handler(object_id=event.control.key),
+                                    key=object_dict.get("id"),
+                                    style=ButtonStyle(shape=RoundedRectangleBorder(radius=10), bgcolor=colors.RED_400)
                                 )
                             ]
                         )
@@ -253,6 +343,7 @@ class WindowService:
             # 添加当前记录的控件
             object_column.controls = object_list
             self.window_page.update()
+
         # 获取用户信息
         user_info: dict = self.window_page.session.get(self.user_key)
         # 定义物体记录的列控件
@@ -350,6 +441,8 @@ class WindowService:
         # 根据路由，构建页面
         if self.window_page.route == "/login":
             self.login_view()
+        elif self.window_page.route == "/register":
+            self.register_view()
         elif self.window_page.route == "/":
             self.index_view()
         elif self.window_page.route == "/history":

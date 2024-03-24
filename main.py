@@ -1,7 +1,7 @@
-from config import GlobalConfig
+from service.WindowService import WindowService
 from service.UserService import register
 from util.MysqlUtil import create_tables
-from service.WindowService import WindowService
+from config import GlobalConfig
 import flet
 
 if __name__ == "__main__":

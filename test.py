@@ -1,16 +1,20 @@
 import flet as ft
 
-
 def main(page: ft.Page):
-    cl = ft.Column(
-        spacing=10,
-        scroll=ft.ScrollMode.ALWAYS,
-        on_scroll_interval=0
+    page.title = "图片示例"
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.padding = 50
+    page.update()
+
+    img = ft.Image(
+        src=r"C:\Users\uodrad\Pictures\640.jpg",
+        width=100,
+        height=100,
+        fit=ft.ImageFit.CONTAIN,
     )
-    for i in range(0, 50):
-        cl.controls.append(ft.Text(f"Text line {i}"))
+    images = ft.Row(expand=1, wrap=False, scroll="always")
 
-    page.add(ft.Container(cl, border=ft.border.all(1)))
+    page.add(img, images)
+    page.update()
 
-
-ft.app(main)
+ft.app(target=main)
