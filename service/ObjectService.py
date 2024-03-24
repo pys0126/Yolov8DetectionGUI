@@ -27,7 +27,7 @@ def object_num_detect(file_path: str, user_id: int) -> Union[int, str]:
             return "不是有效的图片或者视频文件"
         else:
             return object_num_detect_by_video(video_path=file_path, user_id=user_id)
-    
+
 
 def object_num_detect_by_image(image_path: str, user_id: int) -> Union[int, str]:
     """
@@ -69,7 +69,7 @@ def object_num_detect_by_video(video_path: str, user_id: int) -> Union[int, str]
     # 检测视频是否为视频文件
     if not is_video_file(file_path=video_path):
         return "不是有效的视频文件"
-    totality: int = 0  # 初始化数量
+    totality_list: list[int] = []  # 初始化数量列表
     # 定义模型
     object_model: ObjectModel = ObjectModel()
     # 读取视频
@@ -82,16 +82,16 @@ def object_num_detect_by_video(video_path: str, user_id: int) -> Union[int, str]
         # 检测结果列表
         results: list[Results] = yolo_model.predict(source=frame, conf=DetectionConfig.CONFIDENCE_THRESHOLD,
                                                     classes=DetectionConfig.CLASS_NAME_ID)
-        totality: int = 0  # 初始化数量
         for result in results:
-            # 覆盖识别到的数量，不累加，因为每帧数量可能相同
-            totality = len(result.boxes.data)
+            # 将识别到的数量添加到totality_list
+            totality_list.append(len(result.boxes.data))
 
     # 视频名称
     object_model.image_name = os.path.basename(video_path)
     # 当前用户ID
     object_model.user_id = user_id
-    # 识别到的物体数量
+    # 识别到的物体数量，选取最大值
+    totality: int = max(totality_list)
     object_model.totality = totality
     # 创建时间戳
     object_model.create_timestamp = int(time.time())
@@ -100,6 +100,7 @@ def object_num_detect_by_video(video_path: str, user_id: int) -> Union[int, str]
     # 插入数据库
     insert(object_model=object_model)
     return totality
+
 
 def list_object_by_user_id(user_id: int) -> list:
     """

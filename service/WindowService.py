@@ -75,14 +75,12 @@ class WindowService:
             if not file_path:
                 self.open_modal(title="提示", content="未选择文件")
             else:
-                # 先禁用点击识别按钮
-                detection_button.disabled = True
                 # 显示进度环
-                result_container.content = Column(
+                detection_container.content = Column(
                     [ProgressRing(), Text("正在识别中...")],
                     horizontal_alignment=CrossAxisAlignment.CENTER,
                 )
-                result_container.update()
+                detection_container.update()
                 # 识别物体
                 result: Union[str, int] = object_num_detect(file_path=file_path,
                                                             user_id=self.window_page.session.get(
@@ -96,8 +94,8 @@ class WindowService:
                 else:
                     # 将识别结果显示在视图右侧
                     result_container.content = Text(f"识别到的人数：{result}")
-                # 启用点击识别按钮
-                detection_button.disabled = False
+                # 还原点击识别按钮控件
+                detection_container.content = detection_button
                 # 更新页面
                 self.window_page.update()
 
@@ -113,10 +111,14 @@ class WindowService:
         files_picker: FilePicker = FilePicker(on_result=file_picker_handler)
         self.window_page.overlay.append(files_picker)
         self.window_page.update()
-        # 点击识别按钮控件
+        # 构造点击识别按钮控件
         detection_button: FilledTonalButton = FilledTonalButton(text="点击识别", on_click=detection_object,
                                                                 style=ButtonStyle(
                                                                     shape=RoundedRectangleBorder(radius=10)))
+        detection_container: Container = Container(
+            alignment=alignment.center,  # 居中
+            content=detection_button
+        )
         # 图片显示控件
         image_container: Container = Container(
             content=Text("选择待识别图片/视频..."),
@@ -151,21 +153,28 @@ class WindowService:
                         alignment=MainAxisAlignment.SPACE_BETWEEN,
                         controls=[
                             Container(
-                                alignment=alignment.top_left,  # 居中
+                                alignment=alignment.center,  # 居中
                                 content=Text("当前用户：" + self.window_page.session.get(self.user_key).get("username"))
                             ),
-                            Container(
-                                alignment=alignment.top_right,  # 居中
-                                content=FilledTonalButton(text="查看识别记录",
-                                                          on_click=lambda _: self.window_page.go("/history"),
-                                                          style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
-                            ),
-                            Container(
-                                alignment=alignment.top_right,  # 居中
-                                content=FilledTonalButton(text="退出登录",
-                                                          on_click=lambda _: logout(),
-                                                          style=ButtonStyle(shape=RoundedRectangleBorder(radius=10),
-                                                                            bgcolor=colors.RED_400))
+                            Row(
+                                alignment=MainAxisAlignment.END,
+                                controls=[
+                                    Container(
+                                        alignment=alignment.center,  # 居中靠右
+                                        content=FilledTonalButton(text="查看识别记录",
+                                                                  on_click=lambda _: self.window_page.go("/history"),
+                                                                  style=ButtonStyle(
+                                                                      shape=RoundedRectangleBorder(radius=10)))
+                                    ),
+                                    Container(
+                                        alignment=alignment.center,  # 居中靠右
+                                        content=FilledTonalButton(text="退出登录",
+                                                                  on_click=lambda _: logout(),
+                                                                  style=ButtonStyle(
+                                                                      shape=RoundedRectangleBorder(radius=10),
+                                                                      bgcolor=colors.RED_400))
+                                    )
+                                ]
                             )
                         ]
                     ),
@@ -177,10 +186,7 @@ class WindowService:
                             result_container
                         ]
                     ),
-                    Container(
-                        alignment=alignment.center,  # 居中
-                        content=detection_button
-                    )
+                    detection_container
                 ]
             )
         )
@@ -340,8 +346,16 @@ class WindowService:
                         )
                     )
                 )
-            # 添加当前记录的控件
-            object_column.controls = object_list
+            # 添加当前记录的控件，默认为暂无历史记录控件
+            object_column.controls.append(
+                Container(
+                    alignment=alignment.center,
+                    content=Text("暂无历史记录")
+                )
+            )
+            # 如果有记录，则列出记录
+            if object_list:
+                object_column.controls = object_list
             self.window_page.update()
 
         # 获取用户信息
