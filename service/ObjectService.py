@@ -1,11 +1,11 @@
 from ultralytics.engine.results import Results
-from model.ObjectModel import ObjectModel
 from config import DetectionConfig
 from mapper.ObjectMapper import *
 from ultralytics import YOLO
 from pathlib import Path
 from typing import Union
 from PIL import Image
+import time
 import os
 
 
@@ -37,6 +37,10 @@ def object_num_detect(image_path: str, user_id: int) -> Union[int, str]:
     object_model.user_id = user_id
     # 识别到的物体数量
     object_model.totality = totality
+    # 创建时间戳
+    object_model.create_timestamp = int(time.time())
+    # 更新时间戳
+    object_model.update_timestamp = int(time.time())
     # 插入数据库
     insert(object_model=object_model)
     return totality

@@ -43,7 +43,7 @@ def find_by_id(object_id: int) -> Optional[ObjectModel]:
 @auto_close_session
 def find_by_user_id(user_id: int) -> list[Optional[ObjectModel]]:
     """
-    根据用户ID查询物体列表
+    根据用户ID查询物体列表（根据创建时间降序）
     :param user_id: 用户ID
     :return: [
         { ObjectModel-01 },
@@ -51,4 +51,4 @@ def find_by_user_id(user_id: int) -> list[Optional[ObjectModel]]:
         ...
     ]
     """
-    return mysql_session.query(ObjectModel).filter_by(user_id=user_id).all()
+    return mysql_session.query(ObjectModel).order_by(-ObjectModel.create_timestamp).filter_by(user_id=user_id).all()

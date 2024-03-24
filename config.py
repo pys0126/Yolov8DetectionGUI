@@ -7,7 +7,7 @@ class DatabaseConfig:
     DB_USER: str = "root"  # 数据库用户名
     DB_PASSWORD: str = "root"  # 数据库密码
     DB_NAME: str = "detection_system"  # 数据库名
-    DB_ECHO: bool = True  # 是否打印日志
+    DB_ECHO: bool = False  # 是否打印日志
 
 
 class GlobalConfig:

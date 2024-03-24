@@ -133,6 +133,12 @@ class WindowService:
                                 content=FilledTonalButton("查看识别记录",
                                                           on_click=lambda _: self.window_page.go("/history"),
                                                           style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
+                            ),
+                            Container(
+                                alignment=alignment.top_right,  # 居中
+                                content=FilledTonalButton("退出登录",
+                                                          on_click=lambda _: self.window_page.go("/history"),
+                                                          style=ButtonStyle(shape=RoundedRectangleBorder(radius=10)))
                             )
                         ]
                     ),
@@ -203,32 +209,63 @@ class WindowService:
         历史记录页面
         :return:
         """
-        # 获取用户信息
-        user_info: dict = self.window_page.session.get(self.user_key)
-        # 构造列表元素的控件
-        list_view_data: list = []
-        for object_dict in list_object_by_user_id(user_info.get("id")):
-            # 转换时间戳为字符串
-            object_dict["create_time"] = timestamp_to_str(timestamp=object_dict.get("create_timestamp"))
-            list_view_data.append(
-                Container(
-                    alignment=alignment.top_left,
-                    border=border.all(2, colors.SURFACE_VARIANT),
-                    padding=10,
-                    content=Row(
-                        alignment=MainAxisAlignment.SPACE_BETWEEN,
-                        controls=[
-                            Text(f"图片名称：{object_dict.get('image_name')}\n识别到的人数：{object_dict.get('totality')}"),
-                            Text(f"识别时间：{object_dict.get('create_time')}"),
-                            FilledTonalButton(
-                                text="删除",
-                                on_click=lambda _: delete_object_by_id(object_id=object_dict.get("id")),
-                                style=ButtonStyle(shape=RoundedRectangleBorder(radius=10), color=colors.RED_ACCENT)
-                            )
-                        ]
+        def delete_handler(object_id: int) -> None:
+            """
+            删除物体记录
+            :param object_id: 物体记录ID
+            :return:
+            """
+            delete_object_by_id(object_id=object_id)
+            # 重新加载物体记录
+            set_object_column_data()
+
+        def set_object_column_data() -> None:
+            """
+            填充物体记录的列控件
+            :return:
+            """
+            # 先清除物体记录的列控件所有元素
+            object_column.controls.clear()
+            object_list: list = []
+            for object_dict in list_object_by_user_id(user_id=user_info.get("id")):
+                # 转换时间戳为字符串
+                object_dict["create_time"] = timestamp_to_str(timestamp=object_dict.get("create_timestamp"))
+                object_list.append(
+                    Container(
+                        alignment=alignment.top_left,
+                        border=border.all(2, colors.SURFACE_VARIANT),
+                        padding=10,
+                        content=Row(
+                            alignment=MainAxisAlignment.SPACE_BETWEEN,
+                            controls=[
+                                Text(f"图片名称：{object_dict.get('image_name')}\n"
+                                     f"识别到的人数：{object_dict.get('totality')}"),
+                                Text(f"识别时间：{object_dict.get('create_time')}"),
+                                FilledTonalButton(
+                                    text="删除",
+                                    on_click=lambda _: delete_handler(object_id=object_dict.get("id")),
+                                    style=ButtonStyle(shape=RoundedRectangleBorder(radius=10), color=colors.RED_ACCENT)
+                                )
+                            ]
+                        )
                     )
                 )
-            )
+            # 添加当前记录的控件
+            object_column.controls = object_list
+            self.window_page.update()
+        # 获取用户信息
+        user_info: dict = self.window_page.session.get(self.user_key)
+        # 定义物体记录的列控件
+        object_column: Column = Column(
+            alignment=MainAxisAlignment.CENTER,
+            spacing=10,
+            width=GlobalConfig.WINDOW_WIDTH,
+            height=300,
+            scroll=ScrollMode.ALWAYS,
+            on_scroll_interval=0
+        )
+        # 填充物体记录的列控件
+        set_object_column_data()
         self.window_page.views.append(
             View(
                 route="/history",
@@ -250,12 +287,10 @@ class WindowService:
                         ]
                     ),
                     Divider(),
-                    ListView(
-                        data=list_object_by_user_id(user_info.get("id")),
-                        spacing=10,
-                        padding=10,
-                        auto_scroll=True,
-                        controls=list_view_data
+                    Container(
+                        content=object_column,
+                        border=border.all(width=2),
+                        padding=5
                     )
                 ],
             )
