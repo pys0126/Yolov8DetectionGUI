@@ -121,6 +121,7 @@ class WindowService:
                     # 还原各控件
                     image_container.content = Text("选择待识别图片/视频...")
                     result_container.content = Text("这里将显示识别结果")
+                    detection_container.content = detection_button
                 else:
                     # 定义结果文件路径
                     result_file_path: str = os.path.join("cache", os.path.basename(file_path))
